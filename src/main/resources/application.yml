@@ -5,16 +5,20 @@ spring:
   application:
     name: document-service
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:eqdom_credit}
-    username: ${DB_USERNAME:eqdom}
-    password: ${DB_PASSWORD:eqdom}
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:eqdom_credit}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
       ddl-auto: validate
-    properties:
-      hibernate:
-        default_schema: document
+    database-platform: org.hibernate.dialect.MariaDBDialect
     open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    table: flyway_schema_history_document
 
 management:
   endpoints:
@@ -23,4 +27,4 @@ management:
         include: health,info
 
 jwt:
-  secret: ${JWT_SECRET:change-me-in-env-this-is-a-dev-only-default-secret}
+  secret: ${JWT_SECRET:dev-only-default-secret-please-override-me-32-bytes-min-xxxxx}
