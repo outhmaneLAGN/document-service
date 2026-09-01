@@ -20,6 +20,10 @@ spring:
     baseline-on-migrate: true
     baseline-version: 0
     table: flyway_schema_history_document
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
 
 management:
   endpoints:
@@ -29,3 +33,16 @@ management:
 
 jwt:
   secret: ${JWT_SECRET:dev-only-default-secret-please-override-me-32-bytes-min-xxxxx}
+
+credit-service:
+  url: ${CREDIT_SERVICE_URL:http://localhost:8083}
+
+audit-service:
+  url: ${AUDIT_SERVICE_URL:http://localhost:8086}
+
+notification-service:
+  url: ${NOTIFICATION_SERVICE_URL:http://localhost:8085}
+
+document:
+  storage:
+    path: ${DOCUMENT_STORAGE_PATH:./data/documents}
