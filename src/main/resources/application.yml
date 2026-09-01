@@ -1,48 +1,5 @@
-server:
-  port: 8084
-
 spring:
   application:
     name: document-service
-  datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:eqdom_credit}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:}
-    driver-class-name: com.mysql.cj.jdbc.Driver
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    database-platform: org.hibernate.dialect.MariaDBDialect
-    open-in-view: false
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
-    baseline-on-migrate: true
-    baseline-version: 0
-    table: flyway_schema_history_document
-  servlet:
-    multipart:
-      max-file-size: 10MB
-      max-request-size: 10MB
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
-
-jwt:
-  secret: ${JWT_SECRET:dev-only-default-secret-please-override-me-32-bytes-min-xxxxx}
-
-credit-service:
-  url: ${CREDIT_SERVICE_URL:http://localhost:8083}
-
-audit-service:
-  url: ${AUDIT_SERVICE_URL:http://localhost:8086}
-
-notification-service:
-  url: ${NOTIFICATION_SERVICE_URL:http://localhost:8085}
-
-document:
-  storage:
-    path: ${DOCUMENT_STORAGE_PATH:./data/documents}
+  config:
+    import: "configserver:${CONFIG_SERVER_URL:http://localhost:8888}"
