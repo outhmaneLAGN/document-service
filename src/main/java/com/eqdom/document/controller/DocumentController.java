@@ -1,5 +1,9 @@
 package com.eqdom.document.controller;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
@@ -8,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -21,6 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.eqdom.document.dto.ChangeDocumentStatusRequest;
 import com.eqdom.document.dto.DocumentResponse;
+import com.eqdom.document.dto.DocumentSummaryResponse;
 import com.eqdom.document.entity.DocumentStatus;
 import com.eqdom.document.entity.DocumentType;
 import com.eqdom.document.service.DocumentService;
@@ -56,13 +62,32 @@ public class DocumentController {
     @GetMapping("/{id}/download")
     public ResponseEntity<byte[]> download(@PathVariable Long id, Authentication authentication) {
         FileDownload download = documentService.download(id, authentication);
-        MediaType mediaType = download.contentType() != null
+        MediaType mediaType = StringUtils.hasText(download.contentType())
                 ? MediaType.parseMediaType(download.contentType())
                 : MediaType.APPLICATION_OCTET_STREAM;
         return ResponseEntity.ok()
                 .contentType(mediaType)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + download.filename() + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition(download.filename()))
                 .body(download.data());
+    }
+
+    // Strips characters that would break out of the quoted filename value or inject header
+    // control characters, and adds an RFC 5987 filename* fallback for non-ASCII names.
+    private String contentDisposition(String filename) {
+        String safe = filename.replaceAll("[\\r\\n\"\\\\\\p{Cntrl}]", "_");
+        String encoded;
+        try {
+            encoded = URLEncoder.encode(safe, StandardCharsets.UTF_8.name()).replace("+", "%20");
+        } catch (UnsupportedEncodingException ex) {
+            encoded = safe;
+        }
+        return "attachment; filename=\"" + safe + "\"; filename*=UTF-8''" + encoded;
+    }
+
+    @GetMapping("/summary")
+    @PreAuthorize("hasAnyRole('ADMIN','AGENT','RESPONSABLE')")
+    public ResponseEntity<DocumentSummaryResponse> summary(@RequestParam Long creditApplicationId) {
+        return ResponseEntity.ok(documentService.getSummary(creditApplicationId));
     }
 
     @GetMapping

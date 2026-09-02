@@ -20,6 +20,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import com.eqdom.document.client.AuditClient;
 import com.eqdom.document.client.CreditApplicationClient;
 import com.eqdom.document.client.CreditApplicationDto;
+import com.eqdom.document.client.CustomerClient;
+import com.eqdom.document.client.CustomerDto;
 import com.eqdom.document.client.NotificationClient;
 import com.eqdom.document.dto.ChangeDocumentStatusRequest;
 import com.eqdom.document.entity.Document;
@@ -42,13 +44,16 @@ class DocumentServiceTest {
     void setUp() {
         documentRepository = mock(DocumentRepository.class);
         creditApplicationClient = mock(CreditApplicationClient.class);
+        CustomerClient customerClient = mock(CustomerClient.class);
         fileStorageService = mock(FileStorageService.class);
         AuditClient auditClient = mock(AuditClient.class);
         NotificationClient notificationClient = mock(NotificationClient.class);
         DocumentMapper mapper = new DocumentMapper();
 
-        documentService = new DocumentService(documentRepository, creditApplicationClient, auditClient,
-                notificationClient, fileStorageService, mapper);
+        when(customerClient.getCustomer(any())).thenReturn(new CustomerDto(5L, 4L, "Doe", "John", "AB1"));
+
+        documentService = new DocumentService(documentRepository, creditApplicationClient, customerClient,
+                auditClient, notificationClient, fileStorageService, mapper);
 
         List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_CLIENT"));
         clientAuth = mock(Authentication.class);
@@ -67,7 +72,7 @@ class DocumentServiceTest {
 
     @Test
     void uploadRejectsWhenApplicationIsInLockedStatus() {
-        when(creditApplicationClient.getById(1L)).thenReturn(new CreditApplicationDto(1L, "CR-1", 5L, "ACCEPTEE"));
+        when(creditApplicationClient.getById(1L)).thenReturn(new CreditApplicationDto(1L, "CR-1", 5L, "ACCEPTEE", 4L));
         MockMultipartFile file = new MockMultipartFile("file", "cin.pdf", "application/pdf", new byte[]{1, 2, 3});
 
         assertThatThrownBy(() -> documentService.upload(1L, DocumentType.CIN, file, clientAuth))
@@ -76,10 +81,38 @@ class DocumentServiceTest {
     }
 
     @Test
+    void uploadRejectsWhenClientDoesNotOwnTheApplication() {
+        when(creditApplicationClient.getById(1L)).thenReturn(new CreditApplicationDto(1L, "CR-1", 5L, "EN_ETUDE", 999L));
+        MockMultipartFile file = new MockMultipartFile("file", "cin.pdf", "application/pdf", new byte[]{1, 2, 3});
+
+        assertThatThrownBy(() -> documentService.upload(1L, DocumentType.CIN, file, clientAuth))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
+    @Test
+    void getRejectsWhenClientDoesNotOwnTheApplication() {
+        Document document = pendingDocument();
+        when(documentRepository.findById(1L)).thenReturn(Optional.of(document));
+        when(creditApplicationClient.getById(any())).thenReturn(new CreditApplicationDto(1L, "CR-1", 5L, "EN_ETUDE", 999L));
+
+        assertThatThrownBy(() -> documentService.get(1L, clientAuth))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
+    @Test
+    void getAllowsOwningClient() {
+        Document document = pendingDocument();
+        when(documentRepository.findById(1L)).thenReturn(Optional.of(document));
+        when(creditApplicationClient.getById(any())).thenReturn(new CreditApplicationDto(1L, "CR-1", 5L, "EN_ETUDE", 4L));
+
+        assertThat(documentService.get(1L, clientAuth)).isNotNull();
+    }
+
+    @Test
     void changeStatusRejectsRejectionWithoutComment() {
         Document document = pendingDocument();
         when(documentRepository.findById(1L)).thenReturn(Optional.of(document));
-        when(creditApplicationClient.getById(any())).thenReturn(new CreditApplicationDto(1L, "CR-1", 5L, "EN_ETUDE"));
+        when(creditApplicationClient.getById(any())).thenReturn(new CreditApplicationDto(1L, "CR-1", 5L, "EN_ETUDE", 4L));
 
         ChangeDocumentStatusRequest request = ChangeDocumentStatusRequest.builder()
                 .statut(DocumentStatus.REJETE)
@@ -95,7 +128,7 @@ class DocumentServiceTest {
         Document document = pendingDocument();
         document.setStatut(DocumentStatus.VALIDE);
         when(documentRepository.findById(1L)).thenReturn(Optional.of(document));
-        when(creditApplicationClient.getById(any())).thenReturn(new CreditApplicationDto(1L, "CR-1", 5L, "EN_ETUDE"));
+        when(creditApplicationClient.getById(any())).thenReturn(new CreditApplicationDto(1L, "CR-1", 5L, "EN_ETUDE", 4L));
 
         ChangeDocumentStatusRequest request = ChangeDocumentStatusRequest.builder()
                 .statut(DocumentStatus.REJETE)
@@ -112,7 +145,7 @@ class DocumentServiceTest {
         Document document = pendingDocument();
         document.setStatut(DocumentStatus.VALIDE);
         when(documentRepository.findById(1L)).thenReturn(Optional.of(document));
-        when(creditApplicationClient.getById(any())).thenReturn(new CreditApplicationDto(1L, "CR-1", 5L, "EN_ETUDE"));
+        when(creditApplicationClient.getById(any())).thenReturn(new CreditApplicationDto(1L, "CR-1", 5L, "EN_ETUDE", 4L));
 
         assertThatThrownBy(() -> documentService.delete(1L, clientAuth))
                 .isInstanceOf(InvalidRequestException.class)
@@ -123,7 +156,7 @@ class DocumentServiceTest {
     void changeStatusAcceptsValidationWithoutComment() {
         Document document = pendingDocument();
         when(documentRepository.findById(1L)).thenReturn(Optional.of(document));
-        when(creditApplicationClient.getById(any())).thenReturn(new CreditApplicationDto(1L, "CR-1", 5L, "EN_ETUDE"));
+        when(creditApplicationClient.getById(any())).thenReturn(new CreditApplicationDto(1L, "CR-1", 5L, "EN_ETUDE", 4L));
         when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ChangeDocumentStatusRequest request = ChangeDocumentStatusRequest.builder()
